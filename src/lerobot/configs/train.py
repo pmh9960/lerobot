@@ -13,6 +13,7 @@
 # limitations under the License.
 import builtins
 import datetime as dt
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,20 +81,23 @@ class TrainPipelineConfig(HubMixin):
             # The entire train config is already loaded, we just need to get the checkpoint dir
             config_path = parser.parse_arg("config_path")
             if not config_path:
-                raise ValueError(
-                    f"A config_path is expected when resuming a run. Please specify path to {TRAIN_CONFIG_NAME}"
-                )
+                # raise ValueError(
+                #     f"A config_path is expected when resuming a run. Please specify path to {TRAIN_CONFIG_NAME}"
+                # )
+                config_path = Path(self.output_dir) / "checkpoints/last/pretrained_model" / TRAIN_CONFIG_NAME
 
             if not Path(config_path).resolve().exists():
-                raise NotADirectoryError(
-                    f"{config_path=} is expected to be a local path. "
-                    "Resuming from the hub is not supported for now."
-                )
-
-            policy_dir = Path(config_path).parent
-            if self.policy is not None:
-                self.policy.pretrained_path = policy_dir
-            self.checkpoint_path = policy_dir.parent
+                # raise NotADirectoryError(
+                #     f"{config_path=} is expected to be a local path. "
+                #     "Resuming from the hub is not supported for now."
+                # )
+                self.resume = False
+                logging.warning(f"{config_path=} does not exist. Resuming is disabled.")
+            else:
+                policy_dir = Path(config_path).parent
+                if self.policy is not None:
+                    self.policy.pretrained_path = policy_dir
+                self.checkpoint_path = policy_dir.parent
 
         if self.policy is None:
             raise ValueError(
@@ -121,7 +125,8 @@ class TrainPipelineConfig(HubMixin):
 
         if not self.use_policy_training_preset and (self.optimizer is None or self.scheduler is None):
             raise ValueError("Optimizer and Scheduler must be set when the policy presets are not used.")
-        elif self.use_policy_training_preset and not self.resume:
+        # elif self.use_policy_training_preset and not self.resume:
+        elif self.use_policy_training_preset:
             self.optimizer = self.policy.get_optimizer_preset()
             self.scheduler = self.policy.get_scheduler_preset()
 
