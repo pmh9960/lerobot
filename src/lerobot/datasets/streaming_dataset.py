@@ -309,7 +309,8 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
         ep_idx = item["episode_index"]
 
         # "timestamp" restarts from 0 for each episode, whereas we need a global timestep within the single .mp4 file (given by index/fps)
-        current_ts = item["index"] / self.fps
+        # current_ts = item["index"] / self.fps
+        timestamp = item["timestamp"]
 
         episode_boundaries_ts = {
             key: (
@@ -327,11 +328,14 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
 
         # Load video frames, when needed
         if len(self.meta.video_keys) > 0:
-            original_timestamps = self._make_timestamps_from_indices(current_ts, self.delta_indices)
+            # original_timestamps = self._make_timestamps_from_indices(current_ts, self.delta_indices)
 
             # Some timestamps might not result available considering the episode's boundaries
-            query_timestamps = self._get_query_timestamps(
-                current_ts, self.delta_indices, episode_boundaries_ts
+            # query_timestamps = self._get_query_timestamps(
+            #     current_ts, self.delta_indices, episode_boundaries_ts
+            # )
+            query_timestamps = self._get_query_timestamps_ours(
+                timestamp, self.delta_indices, episode_boundaries_ts
             )
             video_frames = self._query_videos(query_timestamps, ep_idx)
 
@@ -344,9 +348,10 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
 
             if self.delta_indices is not None:
                 # We always return the same number of frames. Unavailable frames are padded.
-                padding_mask = self._get_video_frame_padding_mask(
-                    video_frames, query_timestamps, original_timestamps
-                )
+                # padding_mask = self._get_video_frame_padding_mask(
+                #     video_frames, query_timestamps, original_timestamps
+                # )
+                padding_mask = {}
                 updates.append(padding_mask)
 
         result = item.copy()
@@ -376,6 +381,27 @@ class StreamingLeRobotDataset(torch.utils.data.IterableDataset):
             else:
                 query_timestamps[key] = [current_ts]
 
+        return query_timestamps
+
+    def _get_query_timestamps_ours(
+        self,
+        timestamp: float,
+        query_indices: dict[str, list[int]] | None = None,
+        episode_boundaries_ts: dict[str, tuple[float, float]] | None = None,
+    ):
+        """multiple videos do not have same frames per file, so current_ts are different"""
+        query_timestamps = {}
+        for key in self.meta.video_keys:
+            current_ts = timestamp + episode_boundaries_ts[key][0]
+            keys_to_timestamps = self._make_timestamps_from_indices(current_ts, query_indices)
+            if query_indices is not None and key in query_indices:
+                timestamps = keys_to_timestamps[key]
+                # Clamp out timesteps outside of episode boundaries
+                query_timestamps[key] = torch.clamp(
+                    torch.tensor(timestamps), *episode_boundaries_ts[key]
+                ).tolist()
+            else:
+                query_timestamps[key] = [current_ts]
         return query_timestamps
 
     def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict:
