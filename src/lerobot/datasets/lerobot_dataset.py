@@ -982,10 +982,11 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 if self._absolute_to_relative_idx is None
                 else [self._absolute_to_relative_idx[idx] for idx in q_idx]
             )
-            try:
-                result[key] = torch.stack(self.hf_dataset[key][relative_indices])
-            except (KeyError, TypeError, IndexError):
-                result[key] = torch.stack(self.hf_dataset[relative_indices][key])
+            # try:
+            #     result[key] = torch.stack(self.hf_dataset[key][relative_indices])
+            # except (KeyError, TypeError, IndexError):
+            #     result[key] = torch.stack(self.hf_dataset[relative_indices][key])
+            result[key] = torch.stack(self.hf_dataset[relative_indices][key])
         return result
 
     def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, torch.Tensor]:
