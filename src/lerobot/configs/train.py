@@ -72,6 +72,7 @@ class TrainPipelineConfig(HubMixin):
     def validate(self) -> None:
         # HACK: We parse again the cli args here to get the pretrained paths if there was some.
         policy_path = parser.get_path_arg("policy")
+        overwrite = False
         if policy_path:
             # Only load the policy config
             cli_overrides = parser.get_cli_overrides("policy")
@@ -92,6 +93,7 @@ class TrainPipelineConfig(HubMixin):
                 #     "Resuming from the hub is not supported for now."
                 # )
                 self.resume = False
+                overwrite = True
                 logging.warning(f"{config_path=} does not exist. Resuming is disabled.")
             else:
                 policy_dir = Path(config_path).parent
@@ -110,7 +112,9 @@ class TrainPipelineConfig(HubMixin):
             else:
                 self.job_name = f"{self.env.type}_{self.policy.type}"
 
-        if not self.resume and isinstance(self.output_dir, Path) and self.output_dir.is_dir():
+        if (not overwrite) and (
+            not self.resume and isinstance(self.output_dir, Path) and self.output_dir.is_dir()
+        ):
             raise FileExistsError(
                 f"Output directory {self.output_dir} already exists and resume is {self.resume}. "
                 f"Please change your output directory so that {self.output_dir} is not overwritten."
