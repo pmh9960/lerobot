@@ -374,7 +374,8 @@ class _NormalizationMixin:
             )
             if inverse:
                 return (tensor + 1.0) * denom / 2.0 + q01
-            return 2.0 * (tensor - q01) / denom - 1.0
+            # return 2.0 * (tensor - q01) / denom - 1.0
+            return torch.clamp(2.0 * (tensor - q01) / denom - 1.0, -1.0, 1.0)
 
         if norm_mode == NormalizationMode.QUANTILE10:
             q10 = stats.get("q10", None)
